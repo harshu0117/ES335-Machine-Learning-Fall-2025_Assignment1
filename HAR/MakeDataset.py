@@ -82,5 +82,17 @@ print("Training data shape: ",X_train.shape)
 print("Testing data shape: ",X_test.shape)
 
 #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# --- NEW CODE TO SAVE THE DATASET ---
 
+# Create the directory if it doesn't exist
+if not os.path.exists("Dataset"):
+    os.makedirs("Dataset")
 
+# Save the arrays
+np.save("Dataset/X_train.npy", X_train)
+np.save("Dataset/y_train.npy", y_train)
+np.save("Dataset/X_test.npy", X_test)
+np.save("Dataset/y_test.npy", y_test)
+
+print("\nDataset saved successfully in the HAR/Dataset folder!")
+# ------------------------------------

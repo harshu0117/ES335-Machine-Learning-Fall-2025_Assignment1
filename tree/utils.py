@@ -2,76 +2,92 @@
 You can add your own functions here according to your decision tree implementation.
 There is no restriction on following the below template, these fucntions are here to simply help you.
 """
-
+import numpy as np
 import pandas as pd
 
-def one_hot_encoding(X: pd.DataFrame) -> pd.DataFrame:
-    """
-    Function to perform one hot encoding on the input data
-    """
-
-    pass
-
-def check_ifreal(y: pd.Series) -> bool:
+def check_if_real(y: pd.Series) -> bool:
     """
     Function to check if the given series has real or discrete values
     """
+    return y.dtype.kind in 'ifc'
 
-    pass
-
-
-def entropy(Y: pd.Series) -> float:
+def entropy(y: pd.Series) -> float:
     """
     Function to calculate the entropy
     """
+    class_counts = y.value_counts()
+    probabilities = class_counts / len(y)
+    return -np.sum(probabilities * np.log2(probabilities + 1e-9))
 
-    pass
-
-
-def gini_index(Y: pd.Series) -> float:
+def gini_index(y: pd.Series) -> float:
     """
     Function to calculate the gini index
     """
+    class_counts = y.value_counts()
+    probabilities = class_counts / len(y)
+    return 1 - np.sum(probabilities**2)
 
-    pass
-
-
-def information_gain(Y: pd.Series, attr: pd.Series, criterion: str) -> float:
+def information_gain(y: pd.Series, splits: list, criterion: str) -> float:
     """
     Function to calculate the information gain using criterion (entropy, gini index or MSE)
     """
+    parent_impurity = 0
+    if check_if_real(y): # Regression
+        parent_impurity = np.var(y)
+    else: # Classification
+        if criterion == 'information_gain':
+            parent_impurity = entropy(y)
+        else:
+            parent_impurity = gini_index(y)
+            
+    total_len = len(y)
+    weighted_impurity = 0
+    for split in splits:
+        split_len = len(split)
+        if split_len == 0:
+            continue
+        if check_if_real(y): # Regression
+            weighted_impurity += (split_len / total_len) * np.var(split)
+        else: # Classification
+            if criterion == 'information_gain':
+                weighted_impurity += (split_len / total_len) * entropy(split)
+            else:
+                 weighted_impurity += (split_len / total_len) * gini_index(split)
 
-    pass
+    return parent_impurity - weighted_impurity
 
-
-def opt_split_attribute(X: pd.DataFrame, y: pd.Series, criterion, features: pd.Series):
+def opt_split_attribute(X: pd.DataFrame, y: pd.Series, criterion: str, features: pd.Series):
     """
     Function to find the optimal attribute to split about.
-    If needed you can split this function into 2, one for discrete and one for real valued features.
-    You can also change the parameters of this function according to your implementation.
-
-    features: pd.Series is a list of all the attributes we have to split upon
-
-    return: attribute to split upon
     """
+    best_gain = -1
+    best_feature = None
+    best_split_value = None
 
-    # According to wheather the features are real or discrete valued and the criterion, find the attribute from the features series with the maximum information gain (entropy or varinace based on the type of output) or minimum gini index (discrete output).
+    for feature in features:
+        if X[feature].dtype.kind in 'ifc': # Real-valued feature
+            unique_values = sorted(X[feature].unique())
+            for i in range(len(unique_values) - 1):
+                split_value = (unique_values[i] + unique_values[i+1]) / 2
+                left_y = y[X[feature] <= split_value]
+                right_y = y[X[feature] > split_value]
+                gain = information_gain(y, [left_y, right_y], criterion)
+                
+                if gain > best_gain:
+                    best_gain = gain
+                    best_feature = feature
+                    best_split_value = split_value
+        else: # Discrete/Categorical feature
+            unique_values = X[feature].unique()
+            for value in unique_values:
+                # For discrete features, we split on equality
+                eq_y = y[X[feature] == value]
+                neq_y = y[X[feature] != value]
+                gain = information_gain(y, [eq_y, neq_y], criterion)
 
-    pass
-
-
-def split_data(X: pd.DataFrame, y: pd.Series, attribute, value):
-    """
-    Funtion to split the data according to an attribute.
-    If needed you can split this function into 2, one for discrete and one for real valued features.
-    You can also change the parameters of this function according to your implementation.
-
-    attribute: attribute/feature to split upon
-    value: value of that attribute to split upon
-
-    return: splitted data(Input and output)
-    """
-
-    # Split the data based on a particular value of a particular attribute. You may use masking as a tool to split the data.
-
-    pass
+                if gain > best_gain:
+                    best_gain = gain
+                    best_feature = feature
+                    best_split_value = value
+                    
+    return best_feature, best_split_value

@@ -3,7 +3,7 @@
 #                                   ES335- Machine Learning- Assignment 1
 #
 # This script combines the data from the UCI HAR Dataset into a more usable format.
-# The data is combined into a single csv file for each subject and activity. 
+# The data is combined into a single csv file for each subject and activity.
 # The data is then stored in the Combined folder.
 #
 #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -14,8 +14,10 @@ import numpy as np
 import os
 
 # Give the path of the test and train folder of UCI HAR Dataset
-train_path = "./UCI HAR Dataset/train"
-test_path = "./UCI HAR Dataset/test"
+# --- UPDATED PATHS ---
+train_path = "../data/UCI_data/train"
+test_path = "../data/UCI_data/test"
+# ---------------------
 
 # Dictionary of activities. Provided by the dataset.
 ACTIVITIES = {
@@ -83,7 +85,7 @@ print("Done Combining the training data")
 
 
 #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-                                        # Combining Test Data               
+                                        # Combining Test Data
 #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 # Load all the accelerometer data
@@ -99,18 +101,18 @@ y = pd.read_csv(os.path.join(test_path,"y_test.txt"),delim_whitespace=True,heade
 
 # Toggle through all the subjects.
 for subject in np.unique(subject_test.values):
-    
+
         sub_idxs = np.where( subject_test.iloc[:,0] == subject )[0]
         labels = y.loc[sub_idxs]
 
         # Toggle through all the labels.
         for label in np.unique(labels.values):
-    
+
             if not os.path.exists(os.path.join("Combined","Test",ACTIVITIES[label])):
                 os.makedirs(os.path.join("Combined","Test",ACTIVITIES[label]))
-    
+
             label_idxs = labels[labels.iloc[:,0] == label].index
-    
+
             accx = []
             accy = []
             accz = []
@@ -119,12 +121,12 @@ for subject in np.unique(subject_test.values):
                     accx = np.hstack((accx,total_acc_x.loc[idx][64:]))
                     accy = np.hstack((accy,total_acc_y.loc[idx][64:]))
                     accz = np.hstack((accz,total_acc_z.loc[idx][64:]))
-    
+
                 else:
                     accx = total_acc_x.loc[idx]
                     accy = total_acc_y.loc[idx]
                     accz = total_acc_z.loc[idx]
-    
+
             # saving the data into csv file
             data = pd.DataFrame({'accx':accx,'accy':accy,'accz':accz})
             save_path = os.path.join("Combined","Test",ACTIVITIES[label],f"Subject_{subject}.csv")
