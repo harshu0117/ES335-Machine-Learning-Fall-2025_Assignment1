@@ -27,13 +27,19 @@ def gini_index(y: pd.Series) -> float:
     probabilities = class_counts / len(y)
     return 1 - np.sum(probabilities**2)
 
+def mse(y: pd.Series) -> float:
+    """
+    Function to calculate the mean squared error
+    """
+    return np.mean((y - y.mean())**2)
+
 def information_gain(y: pd.Series, splits: list, criterion: str) -> float:
     """
     Function to calculate the information gain using criterion (entropy, gini index or MSE)
     """
     parent_impurity = 0
     if check_if_real(y): # Regression
-        parent_impurity = np.var(y)
+        parent_impurity = mse(y)
     else: # Classification
         if criterion == 'information_gain':
             parent_impurity = entropy(y)
@@ -47,7 +53,7 @@ def information_gain(y: pd.Series, splits: list, criterion: str) -> float:
         if split_len == 0:
             continue
         if check_if_real(y): # Regression
-            weighted_impurity += (split_len / total_len) * np.var(split)
+            weighted_impurity += (split_len / total_len) * mse(split)
         else: # Classification
             if criterion == 'information_gain':
                 weighted_impurity += (split_len / total_len) * entropy(split)

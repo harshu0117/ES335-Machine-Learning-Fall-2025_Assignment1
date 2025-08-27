@@ -43,7 +43,7 @@ class DecisionTree:
 
         # Create a node for the tree
         tree_node = {(best_feature, best_split_value): {}}
-        
+
         # Split data and build subtrees
         if X[best_feature].dtype.kind in 'ifc': # Real feature split
             left_indices = X[best_feature] <= best_split_value
@@ -51,13 +51,20 @@ class DecisionTree:
         else: # Discrete feature split
             left_indices = X[best_feature] == best_split_value
             right_indices = X[best_feature] != best_split_value
-        
+
         X_left, y_left = X[left_indices], y[left_indices]
         X_right, y_right = X[right_indices], y[right_indices]
-        
+
+        # Handle empty splits
+        if len(y_left) == 0 or len(y_right) == 0:
+            if check_if_real(y):
+                return y.mean()
+            else:
+                return y.mode()[0]
+
         tree_node[(best_feature, best_split_value)]['Y'] = self._build_tree(X_left, y_left, depth + 1)
         tree_node[(best_feature, best_split_value)]['N'] = self._build_tree(X_right, y_right, depth + 1)
-        
+
         return tree_node
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> None:
@@ -71,17 +78,36 @@ class DecisionTree:
             return tree # Leaf node
 
         feature, value = list(tree.keys())[0]
-        
-        # Determine which branch to follow
-        if x[feature].dtype.kind in 'ifc':
+
+        # Handle unseen categories
+        if feature not in x:
+            # If a feature is not in the test data, return the majority class of the current node
+            all_leaf_values = []
+            def collect_leaf_values(node):
+                if not isinstance(node, dict):
+                    all_leaf_values.append(node)
+                    return
+                # In Python 3, node.values() returns a view object, not a list. We need to handle sub-dictionaries correctly.
+                for key in node:
+                    for sub_key in node[key]:
+                        collect_leaf_values(node[key][sub_key])
+
+            collect_leaf_values(tree)
+            return pd.Series(all_leaf_values).mode()[0]
+
+        # --- THIS IS THE FIX ---
+        # Determine which branch to follow by checking the type of the split value `value`
+        if isinstance(value, (int, float)):
             go_yes = x[feature] <= value
         else:
             go_yes = x[feature] == value
-            
+        # --- END OF FIX ---
+
         if go_yes:
             return self._predict_single(x, tree[(feature, value)]['Y'])
         else:
             return self._predict_single(x, tree[(feature, value)]['N'])
+
 
     def predict(self, X: pd.DataFrame) -> pd.Series:
         """
@@ -95,19 +121,19 @@ class DecisionTree:
             return
 
         feature, value = list(tree.keys())[0]
-        
+
         # Check if feature is real or discrete for printing condition
         if isinstance(value, (int, float)):
              condition = f"{feature} <= {value:.2f}"
         else:
-             condition = f"{feature} == {value}"
+             condition = f"{feature} == '{value}'"
 
-        print(indent + f"?({condition})")
-        
-        print(indent + "--> Y:")
-        self._plot_recursive(tree[(feature, value)]['Y'], indent + "\t")
-        print(indent + "--> N:")
-        self._plot_recursive(tree[(feature, value)]['N'], indent + "\t")
+        print(indent + f"-> If {condition}:")
+
+        print(indent + "  |--> Y:")
+        self._plot_recursive(tree[(feature, value)]['Y'], indent + "  |\t")
+        print(indent + "  |--> N:")
+        self._plot_recursive(tree[(feature, value)]['N'], indent + "  |\t")
 
     def plot(self) -> None:
         """

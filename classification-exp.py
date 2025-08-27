@@ -1,90 +1,129 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from tree.base import DecisionTree
-from metrics import *
 from sklearn.datasets import make_classification
-from sklearn.model_selection import KFold
+from sklearn.model_selection import train_test_split, KFold
+import matplotlib.pyplot as plt
 
+# Assuming your DecisionTree implementation and metrics are in these files
+from tree.base import DecisionTree
+from metrics import accuracy, precision, recall
+
+# Set random seed for reproducibility
 np.random.seed(42)
 
-# Code given in the question
+# --- Part 2a: Usage of Decision Tree on the Dataset ---
+
+# 1. Generate the dataset
 X, y = make_classification(
-    n_features=2, n_redundant=0, n_informative=2, random_state=1, n_clusters_per_class=2, class_sep=0.5)
+    n_features=2,
+    n_redundant=0,
+    n_informative=2,
+    random_state=1,
+    n_clusters_per_class=2,
+    class_sep=0.5,
+)
 
-# For plotting
+# Convert to pandas DataFrame for our DecisionTree implementation
+X_df = pd.DataFrame(X, columns=[f"feature_{i}" for i in range(X.shape[1])])
+y_s = pd.Series(y, name="target")
+
+# For plotting the dataset
+plt.figure(figsize=(8, 6))
 plt.scatter(X[:, 0], X[:, 1], c=y)
-plt.title("Generated Classification Dataset")
-plt.xlabel("Feature 1")
-plt.ylabel("Feature 2")
-plt.show()
+plt.title("Generated Classification Data")
+plt.xlabel("Feature 0")
+plt.ylabel("Feature 1")
+plt.savefig("classification_dataset.png") # Save the plot
+plt.close()
 
-# Convert to pandas DataFrame/Series for our Decision Tree
-X = pd.DataFrame(X, columns=['Feature1', 'Feature2'])
-y = pd.Series(y)
 
-# --- Question 2 a) ---
-print("--- Question 2 a) ---")
-# Split data into 70% training and 30% testing
-split_index = int(0.7 * len(X))
-X_train, X_test = X[:split_index], X[split_index:]
-y_train, y_test = y[:split_index], y[split_index:]
+# 2. Split the data (70% train, 30% test)
+X_train, X_test, y_train, y_test = train_test_split(
+    X_df, y_s, test_size=0.3, random_state=42
+)
 
-# Train the decision tree
-tree = DecisionTree(criterion='information_gain', max_depth=5)
+# 3. Train the decision tree
+# Using 'information_gain' as criterion and a max_depth of 5 as an example
+tree = DecisionTree(criterion="information_gain", max_depth=5)
 tree.fit(X_train, y_train)
 
-# Make predictions on the test set
+# 4. Make predictions on the test set
 y_hat = tree.predict(X_test)
 
-# Show the results
-print("Learned Decision Tree:")
-tree.plot()
-print("\nPerformance on Test Set:")
-print(f"  Accuracy: {accuracy(y_hat, y_test):.4f}")
-for cls in y.unique():
-    # Sorting unique classes to ensure consistent order
-    cls = sorted(y.unique())[cls]
-    print(f"  Class {cls}:")
-    print(f"    Precision: {precision(y_hat, y_test, cls):.4f}")
-    print(f"    Recall:    {recall(y_hat, y_test, cls):.4f}")
+# 5. Show the performance metrics
+acc = accuracy(y_hat, y_test)
+# Calculate per-class precision and recall
+unique_classes = sorted(y_s.unique())
+precisions = [precision(y_hat, y_test, cls) for cls in unique_classes]
+recalls = [recall(y_hat, y_test, cls) for cls in unique_classes]
+
+print("--- Part 2a: Performance Metrics ---")
+print(f"Accuracy: {acc:.4f}")
+for i, cls in enumerate(unique_classes):
+    print(f"Class {cls}:")
+    print(f"  Precision: {precisions[i]:.4f}")
+    print(f"  Recall: {recalls[i]:.4f}")
+print("-" * 35)
 
 
-# --- Question 2 b) ---
-print("\n--- Question 2 b) ---")
-print("Finding optimal depth using 5-fold cross-validation...")
+# --- Part 2b: 5-Fold Nested Cross-Validation for Optimal Depth ---
 
-depths = range(2, 11) # Test depths from 2 to 10
-mean_accuracies = []
+print("\n--- Part 2b: Finding Optimal Depth with Nested CV ---")
 
-kf = KFold(n_splits=5, shuffle=True, random_state=42)
+# Define the range of depths to test
+depths_to_try = range(2, 11)
 
-for depth in depths:
-    fold_accuracies = []
-    for train_index, val_index in kf.split(X):
-        X_train_fold, X_val_fold = X.iloc[train_index], X.iloc[val_index]
-        y_train_fold, y_val_fold = y.iloc[train_index], y.iloc[val_index]
+# Outer loop for evaluation (5 folds)
+outer_cv = KFold(n_splits=5, shuffle=True, random_state=42)
+# Inner loop for hyperparameter tuning (also 5 folds)
+inner_cv = KFold(n_splits=5, shuffle=True, random_state=42)
+
+outer_cv_scores = []
+
+fold_num = 1
+for train_idx, test_idx in outer_cv.split(X_df, y_s):
+    X_train_outer, X_test_outer = X_df.iloc[train_idx], X_df.iloc[test_idx]
+    y_train_outer, y_test_outer = y_s.iloc[train_idx], y_s.iloc[test_idx]
+
+    best_depth = -1
+    best_avg_accuracy = -1
+
+    # Inner loop to find the best depth for this outer fold
+    for depth in depths_to_try:
+        inner_fold_accuracies = []
+        for train_idx_inner, val_idx_inner in inner_cv.split(X_train_outer, y_train_outer):
+            X_train_inner, X_val_inner = X_train_outer.iloc[train_idx_inner], X_train_outer.iloc[val_idx_inner]
+            y_train_inner, y_val_inner = y_train_outer.iloc[train_idx_inner], y_train_outer.iloc[val_idx_inner]
+
+            # Train a tree with the current depth
+            dt = DecisionTree(criterion="information_gain", max_depth=depth)
+            dt.fit(X_train_inner, y_train_inner)
+            
+            # Evaluate on the inner validation set
+            y_pred_inner = dt.predict(X_val_inner)
+            inner_fold_accuracies.append(accuracy(y_pred_inner, y_val_inner))
         
-        # Train the model
-        dt_fold = DecisionTree(criterion='information_gain', max_depth=depth)
-        dt_fold.fit(X_train_fold, y_train_fold)
-        
-        # Evaluate on the validation set
-        y_val_hat = dt_fold.predict(X_val_fold)
-        fold_accuracies.append(accuracy(y_val_hat, y_val_fold))
-        
-    mean_accuracies.append(np.mean(fold_accuracies))
-    print(f"  Depth: {depth}, Mean CV Accuracy: {np.mean(fold_accuracies):.4f}")
+        # Average accuracy for the current depth
+        avg_accuracy = np.mean(inner_fold_accuracies)
+        if avg_accuracy > best_avg_accuracy:
+            best_avg_accuracy = avg_accuracy
+            best_depth = depth
+            
+    # Train the best model on the full outer training data
+    best_tree = DecisionTree(criterion="information_gain", max_depth=best_depth)
+    best_tree.fit(X_train_outer, y_train_outer)
+    
+    # Evaluate on the outer test set
+    y_pred_outer = best_tree.predict(X_test_outer)
+    outer_fold_accuracy = accuracy(y_pred_outer, y_test_outer)
+    outer_cv_scores.append(outer_fold_accuracy)
+    
+    print(f"Outer Fold {fold_num}: Best Depth={best_depth}, Test Accuracy={outer_fold_accuracy:.4f}")
+    fold_num += 1
 
-optimal_depth = depths[np.argmax(mean_accuracies)]
-print(f"\nOptimal tree depth found: {optimal_depth}")
+print(f"\nAverage accuracy from nested cross-validation: {np.mean(outer_cv_scores):.4f}")
 
-# Plot the results
-plt.figure(figsize=(10, 6))
-plt.plot(depths, mean_accuracies, marker='o')
-plt.title('Cross-Validation Accuracy vs. Tree Depth')
-plt.xlabel('Max Depth')
-plt.ylabel('Mean 5-Fold CV Accuracy')
-plt.xticks(depths)
-plt.grid(True)
-plt.show()
+# To find the overall optimal depth, we can check which depth was selected most often
+# or retrain on the full dataset with the average best depth. For simplicity here,
+# let's just note the best depths found.
+print(f"Optimal depth is likely around the most frequently chosen values in the folds.")

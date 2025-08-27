@@ -1,65 +1,74 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from tree.base import DecisionTree
-from metrics import *
 from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeRegressor as SklearnDecisionTreeRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import mean_squared_error
 
+# Assuming your DecisionTree implementation and metrics are in these files
+from tree.base import DecisionTree
+from metrics import rmse
+
+# Set random seed for reproducibility
 np.random.seed(42)
 
-# Reading the data
-url = 'https://archive.ics.uci.edu/ml/machine-learning-databases/auto-mpg/auto-mpg.data'
-data = pd.read_csv(url, delim_whitespace=True, header=None,
-                 names=["mpg", "cylinders", "displacement", "horsepower", "weight",
-                        "acceleration", "model year", "origin", "car name"])
+# --- Part 3a: Usage of Your Decision Tree for Automotive Efficiency ---
 
-# Clean the above data by removing redundant columns and rows with junk values
-# Compare the performance of your model with the decision tree module from scikit learn
+# 1. Load the dataset
+# The dataset is space-separated. We'll also handle the missing values ('?')
+url = "https://archive.ics.uci.edu/ml/machine-learning-databases/auto-mpg/auto-mpg.data"
+column_names = [
+    "mpg", "cylinders", "displacement", "horsepower",
+    "weight", "acceleration", "model_year", "origin", "car_name"
+]
+df = pd.read_csv(
+    url, names=column_names,
+    na_values="?", comment="\t",
+    sep=" ", skipinitialspace=True
+)
 
+# 2. Preprocess the data
+# Drop the car_name column as it's not a useful feature
+df = df.drop("car_name", axis=1)
+# Drop rows with missing values for simplicity
+df = df.dropna()
+# One-hot encode the 'origin' feature
+df = pd.get_dummies(df, columns=['origin'], prefix='', prefix_sep='')
 
-# --- Data Cleaning ---
-# The 'horsepower' column contains '?' for missing values.
-# We replace '?' with NaN and then drop rows with NaN values.
-data['horsepower'] = data['horsepower'].replace('?', np.nan)
-data.dropna(inplace=True)
-data['horsepower'] = data['horsepower'].astype(float)
+# 3. Split the data into features (X) and target (y)
+X = df.drop("mpg", axis=1)
+y = df["mpg"]
 
-# Drop the 'car name' column as it's a unique identifier and not a useful feature.
-data = data.drop('car name', axis=1)
+# Split into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
 
-# Separate features (X) and target (y)
-X = data.drop('mpg', axis=1)
-y = data['mpg']
-
-# Split data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-
-# --- a) Usage of your decision tree ---
-print("--- Training and Evaluating Your Custom Decision Tree ---")
-# For regression, the criterion isn't used for splitting in our implementation
-# (it's based on variance reduction), but we still pass it.
-my_tree = DecisionTree(criterion='information_gain', max_depth=5)
+# 4. Train your custom decision tree
+# Using 'information_gain' (which defaults to MSE for regression) and max_depth=5
+my_tree = DecisionTree(criterion="information_gain", max_depth=5)
 my_tree.fit(X_train, y_train)
-y_hat_my_tree = my_tree.predict(X_test)
 
-# Calculate and print the RMSE for your model
-rmse_my_tree = rmse(y_hat_my_tree, y_test)
-print(f"  RMSE of your custom Decision Tree: {rmse_my_tree:.4f}")
+# 5. Make predictions and evaluate your model
+my_tree_predictions = my_tree.predict(X_test)
+my_tree_rmse = rmse(my_tree_predictions, y_test)
 
-# --- b) Compare with scikit-learn's decision tree ---
-print("\n--- Training and Evaluating Scikit-learn's Decision Tree ---")
-sklearn_tree = SklearnDecisionTreeRegressor(max_depth=5, random_state=42)
+print("--- Part 3a: Your Decision Tree Performance ---")
+print(f"RMSE of your Decision Tree: {my_tree_rmse:.4f}")
+print("-" * 45)
+
+
+# --- Part 3b: Comparison with Scikit-learn's Decision Tree ---
+
+# 1. Train a scikit-learn Decision Tree Regressor
+# We use the same max_depth for a fair comparison
+sklearn_tree = DecisionTreeRegressor(max_depth=5, random_state=42)
 sklearn_tree.fit(X_train, y_train)
-y_hat_sklearn = sklearn_tree.predict(X_test)
 
-# Calculate and print the RMSE for the scikit-learn model
-# We can use our own rmse function for a fair comparison
-rmse_sklearn = rmse(pd.Series(y_hat_sklearn), y_test.reset_index(drop=True))
-print(f"  RMSE of scikit-learn's Decision Tree: {rmse_sklearn:.4f}")
+# 2. Make predictions and evaluate the scikit-learn model
+sklearn_predictions = sklearn_tree.predict(X_test)
+sklearn_rmse = np.sqrt(mean_squared_error(y_test, sklearn_predictions))
 
-print("\n--- Comparison ---")
-if rmse_my_tree < rmse_sklearn + 0.5: # Allow for small implementation differences
-    print("Your model's performance is comparable to scikit-learn's!")
-else:
-    print("Scikit-learn's model performed significantly better.")
+print("\n--- Part 3b: Scikit-learn vs. Your Model ---")
+print(f"RMSE of Scikit-learn's Decision Tree: {sklearn_rmse:.4f}")
+print(f"RMSE of Your Decision Tree:             {my_tree_rmse:.4f}")
+print("-" * 45)
