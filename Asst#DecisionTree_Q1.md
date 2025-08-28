@@ -1,8 +1,6 @@
 It might seem strange that the regression metrics (RMSE, MAE) are the same for both `information_gain` and `gini_index`. This happens because our `information_gain` utility function is designed to be robust. It first checks if the target variable is real-valued. If it is, it automatically uses **Mean Squared Error (MSE)** as the splitting criterion, which is the correct approach for regression, regardless of whether you passed `"information_gain"` or `"gini_index"`.
 
 
-## `Asst#DecisionTree_Usage.md`
-
 ### Decision Tree Performance on Test Cases
 
 Here are the results from running the `usage.py` script, which tests the four implementations of the Decision Tree.
