@@ -1,83 +1,92 @@
+#=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+#
+#                                   CombineMyScript.py
+#
+# This script reads the raw accelerometer data collected from the smartphone,
+# processes it, and organizes it into a structured 'Combined' folder.
+# It splits the subjects into training and testing sets.
+#
+#=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
 import os
-import shutil
 import pandas as pd
+import numpy as np
+import shutil
 
-def process_and_split_custom_data(source_dir, dest_dir, train_subjects, test_subjects):
-    """
-    Reads custom HAR data, renames columns to the standard format (accx, accy, accz),
-    splits it by subject into train/test sets, and organizes it into the
-    'Combined' folder structure.
+# --- Configuration ---
+# Path to the directory containing your raw CSV files (e.g., h_sit.csv)
+raw_data_path = "mydata"
 
-    Args:
-        source_dir (str): Path to the directory with custom CSV files.
-        dest_dir (str): Path to the output directory (e.g., 'MyData_Combined').
-        train_subjects (list): List of participant IDs for the training set.
-        test_subjects (list): List of participant IDs for the test set.
-    """
-    activity_map = {
-        'sit': 'SITTING',
-        'sleep': 'LAYING',
-        'stand': 'STANDING',
-        'walk': 'WALKING',
-        'walkd': 'WALKING_DOWNSTAIRS',
-        'walku': 'WALKING_UPSTAIRS'
-    }
+# Directory to save the processed data
+output_path = "Combined"
 
-    if os.path.exists(dest_dir):
-        shutil.rmtree(dest_dir)
-    os.makedirs(dest_dir)
-    print(f"Created clean directory: {dest_dir}")
+# Dictionary to map file prefixes to activity names
+ACTIVITIES = {
+    'walk': 'WALKING',
+    'walku': 'WALKING_UPSTAIRS',
+    'walkd': 'WALKING_DOWNSTAIRS',
+    'sit': 'SITTING',
+    'stand': 'STANDING',
+    'sleep': 'LAYING'
+}
 
-    # --- THIS IS THE KEY FIX ---
-    # Define the column name mapping
-    column_rename_map = {'ax': 'accx', 'ay': 'accy', 'az': 'accz'}
-    # --- END OF FIX ---
+# --- Script Logic ---
 
-    for file_name in os.listdir(source_dir):
-        if not file_name.endswith('.csv'):
-            continue
+# Clean up previous runs
+if os.path.exists(output_path):
+    shutil.rmtree(output_path)
+print(f"Cleaned up old directory: {output_path}")
 
-        try:
-            parts = file_name.replace('.csv', '').split('_')
-            participant_id = parts[0]
-            activity_key = parts[1]
-            activity_name = activity_map.get(activity_key)
+# Get all unique subjects from filenames (e.g., 'h', 'r', 'v')
+all_files = [f for f in os.listdir(raw_data_path) if f.endswith('.csv')]
+subjects = sorted(list(set([f.split('_')[0] for f in all_files])))
 
-            if not activity_name:
-                continue
+# Split subjects into training and testing sets (e.g., 80/20 split)
+np.random.seed(42) # for reproducibility
+np.random.shuffle(subjects)
+split_idx = int(len(subjects) * 0.8)
+train_subjects = subjects[:split_idx]
+test_subjects = subjects[split_idx:]
 
-            if participant_id in train_subjects:
-                set_folder = 'Train'
-            elif participant_id in test_subjects:
-                set_folder = 'Test'
-            else:
-                continue
+print(f"Total Subjects: {len(subjects)}. Training: {train_subjects}, Testing: {test_subjects}")
 
-            activity_dest_dir = os.path.join(dest_dir, set_folder, activity_name)
-            os.makedirs(activity_dest_dir, exist_ok=True)
+# Process files for both training and testing sets
+for subject_list, set_name in [(train_subjects, "Train"), (test_subjects, "Test")]:
+    for subject in subject_list:
+        # Find all files for the current subject
+        subject_files = [f for f in all_files if f.startswith(f"{subject}_")]
 
-            source_path = os.path.join(source_dir, file_name)
-            dest_path = os.path.join(activity_dest_dir, f"Subject_{participant_id}.csv")
+        for file in subject_files:
+            try:
+                # Extract activity from filename (e.g., 'sit' from 'h_sit.csv')
+                activity_prefix = file.replace('.csv', '').split('_')[1]
+                activity_name = ACTIVITIES.get(activity_prefix)
 
-            # Read the original CSV
-            data = pd.read_csv(source_path)
-            # Rename the columns
-            data.rename(columns=column_rename_map, inplace=True)
-            # Save the new CSV with the correct column names
-            data.to_csv(dest_path, index=False)
-            
-            print(f"Processed and saved '{file_name}' to '{dest_path}'")
+                if not activity_name:
+                    print(f"Warning: Skipping file with unknown activity prefix: {file}")
+                    continue
 
-        except (IndexError, KeyError):
-            print(f"Warning: Skipping '{file_name}' as it does not match the expected format.")
+                # Create the full path for saving the processed file
+                save_dir = os.path.join(output_path, set_name, activity_name)
+                if not os.path.exists(save_dir):
+                    os.makedirs(save_dir)
 
-    print("\nProcessing complete.")
+                # Read the raw data
+                file_path = os.path.join(raw_data_path, file)
+                data = pd.read_csv(file_path)
 
-if __name__ == '__main__':
-    my_data_source = 'mydata'
-    my_data_combined = 'MyData_Combined'
-    
-    train_participants = ['h', 'r']
-    test_participants = ['v']
-    
-    process_and_split_custom_data(my_data_source, my_data_combined, train_participants, test_participants)
+                # --- FIX: Select and rename the correct columns ---
+                # Your CSV has columns: 'time', 'gFx', 'gFy', 'gFz', 'TgF'
+                # We need the 'gFx', 'gFy', 'gFz' columns
+                processed_data = data[['gFx', 'gFy', 'gFz']].copy()
+                processed_data.columns = ['accx', 'accy', 'accz']
+                # --- END FIX ---
+
+                # Save the processed data
+                save_path = os.path.join(save_dir, f"Subject_{subject}.csv")
+                processed_data.to_csv(save_path, index=False)
+
+            except Exception as e:
+                print(f"Error processing file {file}: {e}")
+
+print(f"\nDone combining data. Processed data is in '{output_path}'")
