@@ -14,7 +14,6 @@ Here are the results from running the `usage.py` script, which tests the four im
 | **information\_gain** | 0.90 | `[1.0, 0.818, 0.833, 1.0, 1.0]` | `[1.0, 0.9, 1.0, 1.0, 0.333]` |
 | **gini\_index** | 0.867 | `[1.0, 0.714, 1.0, 1.0, 1.0]` | `[0.9, 1.0, 0.8, 1.0, 0.333]` |
 
-\<br\>
 
 -----
 
@@ -25,7 +24,6 @@ Here are the results from running the `usage.py` script, which tests the four im
 | **information\_gain** | 0.433 | `[0.5, 1.0, 0.363, 0.0, 0.0]` | `[0.428, 0.5, 0.888, 0.0, 0.0]` |
 | **gini\_index** | 0.30 | `[0.0, 0.0, 0.3, 0.0, 0.0]` | `[0.0, 0.0, 1.0, 0.0, 0.0]` |
 
-\<br\>
 
 -----
 
@@ -36,7 +34,6 @@ Here are the results from running the `usage.py` script, which tests the four im
 | **information\_gain (MSE)** | 0.3601 | 0.2407 |
 | **gini\_index (MSE)** | 0.3601 | 0.2407 |
 
-\<br\>
 
 -----
 
